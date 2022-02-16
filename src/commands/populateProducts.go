@@ -1,22 +1,22 @@
 package main
 
 import (
-	"amabassador/src/database"
-	"amabassador/src/models"
+	"ambassador/src/database"
+	"ambassador/src/models"
 	"math/rand"
 
 	"github.com/bxcodec/faker/v3"
 )
 
-func main(){
+func main() {
 	database.Connect()
 
 	for i := 0; i < 30; i++ {
 		product := models.Product{
-			Title: faker.Username(),
+			Title:       faker.Username(),
 			Description: faker.Username(),
-			Image: faker.URL(),
-			Price: float64(rand.Intn(90) + 10),
+			Image:       faker.URL(),
+			Price:       float64(rand.Intn(90) + 10),
 		}
 
 		database.DB.Create(&product)

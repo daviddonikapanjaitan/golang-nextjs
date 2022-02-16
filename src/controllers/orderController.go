@@ -4,8 +4,10 @@ import (
 	"amabassador/src/database"
 	"amabassador/src/models"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/smtp"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stripe/stripe-go/v72"
@@ -25,6 +27,20 @@ func Orders(c *fiber.Ctx) error {
 	return c.JSON(orders )
 }
 
+func GetOrdersById(c *fiber.Ctx) error {
+	var orders []models.Order
+	id, _ := strconv.Atoi(c.Params("id"))
+
+	database.DB.Preload("OrderItems").Where("id = ?", id).Find(&orders)
+
+	for i, order := range orders {
+		orders[i].Name = order.FullName()
+		orders[i].Total = order.GetTotal()
+	}
+
+	return c.JSON(orders)
+}
+
 type CreateOrderRequest struct {
 	Code 			string
 	FirstName		string
@@ -39,7 +55,7 @@ type CreateOrderRequest struct {
 
 func CreateOrder(c *fiber.Ctx) error {
 	var request CreateOrderRequest
-	
+
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
@@ -58,16 +74,16 @@ func CreateOrder(c *fiber.Ctx) error {
 	}
 
 	order := models.Order{
-		Code: link.Code,
-		UserId: link.UserId,
+		Code:            link.Code,
+		UserId:          link.UserId,
 		AmbassadroEmail: link.User.Email,
-		FirstName: request.FirstName,
-		LastName: request.LastName,
-		Email: request.Email,
-		Address: request.Address,
-		Country: request.Country,
-		City: request.City,
-		Zip: request.Zip,
+		FirstName:       request.FirstName,
+		LastName:        request.LastName,
+		Email:           request.Email,
+		Address:         request.Address,
+		Country:         request.Country,
+		City:            request.City,
+		Zip:             request.Zip,
 	}
 
 	tx := database.DB.Begin()
@@ -86,17 +102,19 @@ func CreateOrder(c *fiber.Ctx) error {
 		product := models.Product{}
 		product.Id = uint(requestProduct["product_id"])
 		database.DB.First(&product)
+		fmt.Println("product price", product.Price)
 
 		total := product.Price * float64(requestProduct["quantity"])
 
 		item := models.OrderItem{
-			OrderId: order.Id,
-			ProductTitle: product.Title,
-			Price: product.Price,
-			Quantity: uint(requestProduct["quantity"]),
+			OrderId:           order.Id,
+			ProductTitle:      product.Title,
+			Price:             product.Price,
+			Quantity:          uint(requestProduct["quantity"]),
 			AmbassadorRevenue: 0.1 * total,
-			AdminRevenue: 0.9 * total,
+			AdminRevenue:      0.9 * total,
 		}
+		fmt.Println("item ada", item)
 
 		if err := tx.Create(&item).Error; err != nil {
 			tx.Rollback()
@@ -107,25 +125,30 @@ func CreateOrder(c *fiber.Ctx) error {
 		}
 
 		lineItems = append(lineItems, &stripe.CheckoutSessionLineItemParams{
-			Name: stripe.String(product.Title),
+			Name:        stripe.String(product.Title),
 			Description: stripe.String(product.Description),
-			Images: []*string{stripe.String(product.Image)},
-			Amount: stripe.Int64(100 * int64(product.Price)),
-			Currency: stripe.String("usd"),
-			Quantity: stripe.Int64(int64(requestProduct["quantity"])),
+			Images:      []*string{stripe.String(product.Image)},
+			Amount:      stripe.Int64(100 * int64(product.Price)),
+			Currency:    stripe.String("usd"),
+			Quantity:    stripe.Int64(int64(requestProduct["quantity"])),
 		})
 	}
 
-	stripe.Key = "sk_test_51KS3PGJcvQwsGW8PVf6swUx01lrhh75CDUz3mOotwCRCeAL8OhBGQ7qFvBsps4ZRlkEyCpnI6c2L558OpsKTLmIq00n5f8UQEV"
+	stripe.Key = "sk_test_51H0wSsFHUJ5mamKOVQx6M8kihCIxpBk6DzOhrf4RrpEgqh2bfpI7vbsVu2j5BT0KditccHBnepG33QudcrtBUHfv00Bbw1XXjL"
 
 	params := stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String("http://localhost:5000/success?source={CHECKOUT_SESSION_ID}"),
-		CancelURL: stripe.String("http://localhost:5000/error"),
+		SuccessURL:         stripe.String("http://localhost:5000/success?source={CHECKOUT_SESSION_ID}"),
+		CancelURL:          stripe.String("http://localhost:5000/error"),
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
-		LineItems: lineItems,
+		LineItems:          lineItems,
 	}
-	
+
 	source, err := session.New(&params)
+	j, err := json.Marshal(&source)
+	raw := json.RawMessage(string(j))
+    if err != nil {
+        panic(err)
+    }
 
 	if err != nil {
 		tx.Rollback()
@@ -147,7 +170,34 @@ func CreateOrder(c *fiber.Ctx) error {
 
 	tx.Commit()
 
-	return c.JSON(order)
+	return c.JSON(raw)
+}
+
+func TestStripe(c *fiber.Ctx) error {
+	stripe.Key = "sk_test_51H0wSsFHUJ5mamKOVQx6M8kihCIxpBk6DzOhrf4RrpEgqh2bfpI7vbsVu2j5BT0KditccHBnepG33QudcrtBUHfv00Bbw1XXjL"
+
+	params := stripe.CheckoutSessionParams{
+		SuccessURL:         stripe.String("http://localhost:8000/success?source={CHECKOUT_SESSION_ID}"),
+		CancelURL:          stripe.String("http://localhost:8000/error"),
+		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+			  Name:        stripe.String("Produk Bagus"),
+			  Amount:      stripe.Int64(100 * int64(300)),
+			  Currency:    stripe.String("usd"),
+			  Quantity: stripe.Int64(2),
+			},
+		},
+	}
+
+	source, _ := session.New(&params)
+    j, err := json.Marshal(&source)
+	raw := json.RawMessage(string(j))
+    if err != nil {
+        panic(err)
+    }
+
+	return c.JSON(raw)
 }
 
 func CompleteOrder(c *fiber.Ctx) error {

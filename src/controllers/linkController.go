@@ -15,12 +15,17 @@ func Link(c *fiber.Ctx) error {
 
 	var links []models.Link
 
-	database.DB.Where("user_id = ?", id).Find(&links)
+	database.DB.Preload("Products").Where("user_id = ?", id).Find(&links)
 
 	for i, link := range links {
 		var orders []models.Order
 
-		database.DB.Where("code = ? and complete = true", link.Code).Find(&orders)
+		database.DB.Preload("OrderItems").Where("code = ? and complete = true", link.Code).Find(&orders)
+
+		for i, order := range orders {
+			orders[i].Name = order.FullName()
+			orders[i].Total = order.GetTotal()
+		}
 
 		links[i].Orders = orders
 	}
@@ -41,9 +46,9 @@ func CreateLink(c *fiber.Ctx) error {
 
 	id, _ := middlewares.GetUserId(c)
 
-	link := models.Link {
+	link := models.Link{
 		UserId: id,
-		Code: faker.Username(),
+		Code:   faker.Username(),
 	}
 
 	for _, productId := range request.Products {
@@ -72,7 +77,7 @@ func Stats(c *fiber.Ctx) error {
 
 	for _, link := range links {
 		database.DB.Preload("OrderItems").Find(&orders, &models.Order{
-			Code: link.Code,
+			Code:     link.Code,
 			Complete: true,
 		})
 
@@ -83,8 +88,8 @@ func Stats(c *fiber.Ctx) error {
 		}
 
 		result = append(result, fiber.Map{
-			"code": link.Code,
-			"count": len(orders),
+			"code":    link.Code,
+			"count":   len(orders),
 			"revenue": revenue,
 		})
 	}

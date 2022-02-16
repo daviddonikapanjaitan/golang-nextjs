@@ -27,6 +27,7 @@ func Setup(app *fiber.App){
 	adminAuthenticated.Delete("products/:id", controllers.DeleteProduct) 
 	adminAuthenticated.Get("users/:id/links", controllers.Link)
 	adminAuthenticated.Get("orders", controllers.Orders)
+	adminAuthenticated.Get("orders/:id", controllers.GetOrdersById)
 
 	ambassador := api.Group("ambassador")
 	ambassador.Post("register", controllers.Register)
@@ -48,4 +49,5 @@ func Setup(app *fiber.App){
 	checkout.Get("links/:code", controllers.GetLink)
 	checkout.Post("orders", controllers.CreateOrder)
 	checkout.Post("orders/confirm", controllers.CompleteOrder)
+	checkout.Post("test-stripe", controllers.TestStripe)
 }

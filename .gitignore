@@ -1,2 +1,6 @@
 .dbdata
 .dbdata/**
+.frontend/react-admin/node_modules
+.frontend/react-admin/node_modules/**
+.frontend/react-ambassador/node_modules
+.frontend/react-ambassador/node_modules/**

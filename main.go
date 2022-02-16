@@ -10,7 +10,7 @@ import (
 )
  
 func main() {   
-    database.Connect();
+    database.Connect(); 
     database.AutoMigrate();
     database.SetupRedis();
     database.SetupCacheChannel()

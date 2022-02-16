@@ -69,7 +69,7 @@ func DeleteProduct(c *fiber.Ctx) error {
 
 	product := models.Product{}
 	product.Id = uint(id)
-
+	
 	database.DB.Delete(&product)
 
 	go database.ClearCache("products_frontend", "products_backend")

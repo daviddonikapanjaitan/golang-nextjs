@@ -4,3 +4,5 @@
 .frontend/react-admin/node_modules/**
 .frontend/react-ambassador/node_modules
 .frontend/react-ambassador/node_modules/**
+.frontend/react-checkout/node_modules
+.frontend/react-checkout/node_modules/**
